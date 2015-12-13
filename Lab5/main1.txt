@@ -1,0 +1,56 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_memmap.h"
+#include "driverlib/debug.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/adc.h"  // include ADC driver
+
+#define TARGET_IS_BLIZZARD_RB1 // Symbol for the API's in ROM.
+#include "driverlib/rom.h"
+
+#ifdef DEBUG
+void__error__(char *pcFilename, uint32_t ui32Line) {
+}
+#endif
+
+int main() {
+	uint32_t ui32ADC0Value[4]; 			// ADC FIFO
+	volatile uint32_t ui32TempAvg; 		// Store average
+	volatile uint32_t ui32TempValueC; 	// Temperature in C
+	volatile uint32_t ui32TempValueF; 	// Temperature in F
+
+	// Use a 40 MHz
+	ROM_SysCtlClockSet(
+			SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN
+					| SYSCTL_XTAL_16MHZ);
+
+	ROM_SysCtlPeripheralEnable( SYSCTL_PERIPH_ADC0); // enable the ADC0
+	ROM_ADCHardwareOversampleConfigure( ADC0_BASE, 64); // configure hardware averaging
+
+	// Configure ADC0 sequencer to use sample sequencer 1, and have the processor trigger the sequence.
+	ROM_ADCSequenceConfigure( ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+	// Configure each step.
+	ROM_ADCSequenceStepConfigure( ADC0_BASE, 1, 0, ADC_CTL_TS);
+	ROM_ADCSequenceStepConfigure( ADC0_BASE, 1, 1, ADC_CTL_TS);
+	ROM_ADCSequenceStepConfigure( ADC0_BASE, 1, 2, ADC_CTL_TS);
+	// Sample temperature
+	ROM_ADCSequenceStepConfigure( ADC0_BASE, 1, 3,
+			ADC_CTL_TS | ADC_CTL_IE | ADC_CTL_END);
+	ROM_ADCSequenceEnable( ADC0_BASE, 1); // Enable ADC sequencer 1
+
+	while (1) {
+		ROM_ADCIntClear(ADC0_BASE, 1); // Clear ADC0 interrupt flag.
+		ROM_ADCProcessorTrigger(ADC0_BASE, 1); // Trigger ADC conversion.
+
+		while (!ADCIntStatus(ADC0_BASE, 1, false))
+			; // wait for conversion to complete.
+
+		ROM_ADCSequenceDataGet(ADC0_BASE, 1, ui32ADC0Value); // store data into ui32ADC0Value
+		// Average read values, and round.
+		// Each Value in the array is the result of the mean of 64 samples.
+		ui32TempAvg = (ui32ADC0Value[0] + ui32ADC0Value[1] + ui32ADC0Value[2]
+				+ ui32ADC0Value[3] + 2) / 4;
+		ui32TempValueC = (1475 - ((2475 * ui32TempAvg)) / 4096) / 10; // calc temp in C
+		ui32TempValueF = ((ui32TempValueC * 9) + 160) / 5; // convert from C to F
+	}
+}
