@@ -1,0 +1,1 @@
+"./main.obj" "./tm4c123gh6pm_startup_ccs.obj" "./OrbitOled/ChrFont0.obj" "./OrbitOled/FillPat.obj" "./OrbitOled/OrbitOled.obj" "./OrbitOled/OrbitOledChar.obj" "./OrbitOled/OrbitOledGrph.obj" "./OrbitOled/delay.obj" "./I2CEEPROM/I2CEEPROM.obj" "../driverlib.lib" "../tm4c123gh6pm.cmd" -l"libc.a" 
